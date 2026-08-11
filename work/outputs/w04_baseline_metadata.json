@@ -1,0 +1,52 @@
+{
+  "action_counts": {
+    "expand_and_refresh": 77,
+    "monitor": 26894,
+    "refresh_and_review_ctr": 3029
+  },
+  "base_rate": 0.5420666666666667,
+  "precision": {
+    "precision_at_10": 0.5,
+    "precision_at_20": 0.55,
+    "precision_at_50": 0.62
+  },
+  "reason_code_counts": {
+    "demand_with_ctr_gap": 3029,
+    "general_review": 26894,
+    "thin_visible_page": 77
+  },
+  "rows": 30000,
+  "score_formula": {
+    "ctr_gap_score": 0.4,
+    "depth_gap_score": 0.15,
+    "visibility_score": 0.45
+  },
+  "signal_verdicts": {
+    "ctr_vs_position": {
+      "mean_ctr_by_tier": {
+        "deep": 0.0432,
+        "page_1": 0.3388,
+        "page_3_5": 0.1432,
+        "striking": 0.2668,
+        "top_3": 0.3466
+      },
+      "monotonic_decreasing_top3_to_deep": true,
+      "n_by_tier": {
+        "deep": 389,
+        "page_1": 7064,
+        "page_3_5": 4330,
+        "striking": 4485,
+        "top_3": 458
+      },
+      "verdict": "CONFIRMED"
+    },
+    "staleness_vs_decline": {
+      "fresh_under_180_decline_rate": 0.5424797156843023,
+      "fresh_under_180_n": 29826,
+      "stale_180plus_decline_rate": 0.47126436781609193,
+      "stale_180plus_n": 174,
+      "verdict": "OPPOSITE"
+    }
+  },
+  "top10_distinct_clients": 5
+}
