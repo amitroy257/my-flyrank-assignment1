@@ -1,0 +1,98 @@
+{
+  "action_queue": {
+    "action_counts": {
+      "expand_and_refresh": 315,
+      "monitor": 51850,
+      "refresh_and_review_ctr": 12854
+    },
+    "rows": 65019
+  },
+  "comparison": {
+    "baseline_rule (frozen, W04/W05 methodology)": {
+      "average_precision": 0.4881,
+      "base_rate_test": 0.4718,
+      "precision_at_100": 0.66,
+      "precision_at_20": 0.6,
+      "precision_at_50": 0.66,
+      "roc_auc": 0.4931
+    },
+    "logistic_regression": {
+      "average_precision": 0.5228,
+      "base_rate_test": 0.4718,
+      "precision_at_100": 0.76,
+      "precision_at_20": 0.8,
+      "precision_at_50": 0.74,
+      "roc_auc": 0.5259
+    },
+    "random_forest": {
+      "average_precision": 0.5308,
+      "base_rate_test": 0.4718,
+      "precision_at_100": 0.83,
+      "precision_at_20": 0.85,
+      "precision_at_50": 0.82,
+      "roc_auc": 0.5301
+    }
+  },
+  "decision_date": "2026-04-01",
+  "panel": {
+    "clients": 27,
+    "decline_rate_future": 0.5772927913379166,
+    "rows": 65019
+  },
+  "random_state": 42,
+  "signal_checks": {
+    "ctr_vs_position_tier": {
+      "mean_ctr": {
+        "deep": 0.0005,
+        "page_1": 0.0028,
+        "page_3_5": 0.0013,
+        "striking": 0.0022,
+        "top_3": 0.0032
+      },
+      "n": {
+        "deep": 880,
+        "page_1": 29124,
+        "page_3_5": 8202,
+        "striking": 14051,
+        "top_3": 5100
+      }
+    },
+    "staleness_vs_true_future_label": {
+      "decline_rate": {
+        "fresh_under_180": 0.5772602824007137,
+        "stale_180plus": 1.0
+      },
+      "n": {
+        "fresh_under_180": 65014,
+        "stale_180plus": 5
+      }
+    }
+  },
+  "split": {
+    "strategy": "client_grouped_row_balanced_holdout",
+    "test_clients": 14,
+    "test_rows": 16129,
+    "train_clients": 13,
+    "train_rows": 48890
+  },
+  "top_features_impurity": {
+    "avg_daily_clicks_q1": 0.061,
+    "avg_daily_q1": 0.1155,
+    "avg_position_q1": 0.2094,
+    "content_age_days_at_decision": 0.2659,
+    "ctr_q1": 0.079,
+    "impressions_cv_q1": 0.0897,
+    "search_volume": 0.0183,
+    "word_count_filled": 0.1326
+  },
+  "top_features_permutation": {
+    "avg_position_q1": 0.0033,
+    "competition_level_MEDIUM": 0.0007,
+    "ctr_q1": 0.0277,
+    "main_intent_commercial": 0.002,
+    "main_intent_informational": 0.0021,
+    "main_intent_transactional": 0.0011,
+    "search_volume": 0.0007,
+    "word_count_filled": 0.0269
+  }
+}

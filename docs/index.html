@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refresh &amp; CTR-Opportunity Scoring — A FlyRank Search Intelligence Capstone</title>
+<meta name="description" content="A prior-quarter-to-future-month model for ranking which content pages to review first, validated against a transparent baseline on FlyRank's search warehouse.">
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --bg-alt: #f2f0ea;
+    --card: #ffffff;
+    --text: #1c1f22;
+    --text-muted: #565f66;
+    --border: #e2ddd0;
+    --accent: #2f6f4f;
+    --accent-soft: #e8f2ec;
+    --link: #1f5c8f;
+    --tag-confirmed: #2f6f4f;
+    --tag-opposite: #a8471f;
+    --code-bg: #f2f0ea;
+    --shadow: 0 1px 2px rgba(20,20,20,0.04), 0 8px 24px rgba(20,20,20,0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a;
+      --bg-alt: #1b1f23;
+      --card: #1c2024;
+      --text: #e9e7e1;
+      --text-muted: #a3a9ad;
+      --border: #2c3238;
+      --accent: #5aa980;
+      --accent-soft: #1c2b23;
+      --link: #7fb4dd;
+      --tag-confirmed: #5aa980;
+      --tag-opposite: #d98a5f;
+      --code-bg: #21262b;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171a; --bg-alt: #1b1f23; --card: #1c2024; --text: #e9e7e1; --text-muted: #a3a9ad;
+    --border: #2c3238; --accent: #5aa980; --accent-soft: #1c2b23; --link: #7fb4dd;
+    --tag-confirmed: #5aa980; --tag-opposite: #d98a5f; --code-bg: #21262b;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfaf7; --bg-alt: #f2f0ea; --card: #ffffff; --text: #1c1f22; --text-muted: #565f66;
+    --border: #e2ddd0; --accent: #2f6f4f; --accent-soft: #e8f2ec; --link: #1f5c8f;
+    --tag-confirmed: #2f6f4f; --tag-opposite: #a8471f; --code-bg: #f2f0ea;
+    --shadow: 0 1px 2px rgba(20,20,20,0.04), 0 8px 24px rgba(20,20,20,0.05);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    font-size: 16.5px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+
+  header.hero {
+    background: linear-gradient(180deg, var(--accent-soft), var(--bg) 85%);
+    border-bottom: 1px solid var(--border);
+    padding: 64px 0 40px;
+  }
+  .kicker {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    line-height: 1.2;
+    margin: 0 0 16px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle { color: var(--text-muted); font-size: 1.05rem; max-width: 640px; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 22px;
+    font-size: 0.85rem; color: var(--text-muted);
+  }
+  .meta-row span strong { color: var(--text); }
+
+  nav.toc {
+    display: flex; flex-wrap: wrap; gap: 6px 4px;
+    margin-top: 26px; font-size: 0.82rem;
+  }
+  nav.toc a {
+    color: var(--text-muted); text-decoration: none; padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: 20px; background: var(--card);
+  }
+  nav.toc a:hover { color: var(--accent); border-color: var(--accent); }
+
+  main { padding: 8px 0 80px; }
+  section { padding: 40px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  h2 {
+    font-size: 1.5rem; margin: 0 0 6px; letter-spacing: -0.01em;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 1rem; }
+  h3 { font-size: 1.08rem; margin: 26px 0 8px; }
+  p { margin: 12px 0; }
+  a { color: var(--link); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 6px 0; }
+  code {
+    background: var(--code-bg); padding: 0.12em 0.4em; border-radius: 4px;
+    font-size: 0.9em; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px 22px; box-shadow: var(--shadow); margin: 18px 0;
+  }
+  .abstract-card p { margin: 0; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .stat {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; text-align: left;
+  }
+  .stat .n { font-size: 1.5rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stat .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+  .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+  .stat-row .stat { flex: 1 1 150px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  .table-scroll { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; }
+  .table-scroll table { margin: 0; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { background: var(--bg-alt); font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); }
+  tr:last-child td { border-bottom: none; }
+  td.win { color: var(--accent); font-weight: 700; }
+  td.num { font-variant-numeric: tabular-nums; }
+
+  .tag {
+    display: inline-block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+    padding: 3px 9px; border-radius: 20px; text-transform: uppercase;
+  }
+  .tag.confirmed { background: var(--accent-soft); color: var(--tag-confirmed); }
+  .tag.opposite { background: color-mix(in srgb, var(--tag-opposite) 16%, transparent); color: var(--tag-opposite); }
+
+  figure { margin: 22px 0; }
+  figure img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border); background: var(--card); }
+  figcaption { font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; }
+
+  .callout {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 18px 0; font-size: 0.96rem;
+  }
+  .callout.warn { border-left-color: var(--tag-opposite); background: color-mix(in srgb, var(--tag-opposite) 10%, transparent); }
+
+  .limits-list li { margin: 10px 0; }
+  .limits-list strong { color: var(--text); }
+
+  footer {
+    padding: 40px 0 60px; color: var(--text-muted); font-size: 0.85rem; text-align: center;
+  }
+  footer a { color: var(--text-muted); }
+
+  .repro-links { list-style: none; padding: 0; display: grid; gap: 8px; }
+  .repro-links li {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .repro-links .path { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.85rem; }
+
+  ::selection { background: var(--accent-soft); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">FlyRank ML Internship — Capstone Research Paper</div>
+    <h1>Refresh &amp; CTR-Opportunity Scoring: does a learned model beat a transparent rule at ranking content pages for review?</h1>
+    <p class="subtitle">Lane 2 — Refresh / Content Opportunity Scoring, built on a genuine
+      prior-quarter → future-month outcome from FlyRank's real search warehouse, not a
+      same-window proxy.</p>
+    <div class="meta-row">
+      <span>Track: <strong>Machine Learning</strong></span>
+      <span>Data: <strong>FlyRank/internship-warehouse</strong> (Hugging Face)</span>
+      <span>Window: <strong>Q1 2026 → April 2026</strong></span>
+      <span>Panel: <strong>65,019 pages · 27 clients</strong></span>
+    </div>
+    <nav class="toc">
+      <a href="#abstract">Abstract</a>
+      <a href="#intro">Introduction</a>
+      <a href="#data">Data</a>
+      <a href="#methodology">Methodology</a>
+      <a href="#results">Results</a>
+      <a href="#limitations">Limitations</a>
+      <a href="#recommendations">Recommendations</a>
+      <a href="#reproducibility">Reproducibility</a>
+      <a href="#acknowledgments">Acknowledgments</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="abstract">
+    <h2><span class="num">01</span> Abstract</h2>
+    <div class="card abstract-card">
+      <p>
+        Content editors can only review a handful of pages a week — which existing pages should
+        they open first? This paper asks whether a learned model can out-rank a transparent,
+        hand-written rule at predicting which pages will lose search traffic <em>next month</em>,
+        using only signals observable <em>this</em> quarter. Working directly against FlyRank's
+        real search warehouse (DuckDB over ~35M raw page-day rows), I built a page-level panel of
+        65,019 pages across 27 clients, defined a genuine future-window decline label (Q1 2026
+        daily rate vs. April 2026 daily rate — not a same-window proxy), and trained a Logistic
+        Regression and a Random Forest against a frozen, transparent CTR-vs-position baseline
+        rule, validated on a client-grouped, row-balanced hold-out split. The Random Forest wins
+        on every ranking metric — precision@20 of 0.85 vs. the baseline's 0.60, against a 47.2%
+        base rate — while overall discrimination (ROC-AUC ≈ 0.53) stays modest across all three
+        approaches, an honest signal that forecasting a real future outcome from one quarter of
+        history is a genuinely harder problem than the proxy labels used earlier in this project.
+        The result: a ranked, reason-coded action queue that beats the rule at the top of the
+        list, with its real limits stated plainly rather than smoothed over.
+      </p>
+    </div>
+  </section>
+
+  <section id="intro">
+    <h2><span class="num">02</span> Introduction</h2>
+    <p>
+      A FlyRank content editor has limited weekly review capacity — realistically 20 to 100 pages
+      out of a client's full catalog. Left unranked, that means guessing. This project's question,
+      carried through every weekly milestone since Week 1: <strong>among a client's existing
+      pages with real search demand, which ones should an editor open first, and does a learned
+      score actually beat a rule a human could read in one sentence?</strong>
+    </p>
+    <p>
+      <strong>Decision supported:</strong> a content editor or SEO reviewer chooses where to spend
+      scarce review time — refresh copy, expand thin content, fix a CTR problem, or leave a page
+      alone. <strong>Unit of analysis:</strong> one content page (<code>content_hash_id</code>),
+      scored inside one client (<code>client_hash_id</code>, used only for grouping and
+      hold-out splits, never as a feature). <strong>Cost of a wrong call:</strong> ranking a
+      healthy page high wastes an editor's limited hours; burying a genuinely declining
+      high-demand page means it keeps losing traffic unseen.
+    </p>
+    <p>
+      Every earlier notebook in this project (W01–W05) used <code>is_declining_label</code>, a
+      proxy computed from the <em>same window</em> it was applied to
+      (<code>trend_direction == "down"</code>) — useful for learning the workflow, but flagged
+      from the first week as "a stand-in, not the ideal capstone target." This paper builds the
+      stronger version: a label observed strictly <em>after</em> the decision point, on the real
+      warehouse, at real scale.
+    </p>
+  </section>
+
+  <section id="data">
+    <h2><span class="num">03</span> Data</h2>
+    <p>
+      <strong>Release:</strong> <code>FlyRank/internship-warehouse</code> (Hugging Face, gated,
+      instant approval), covering 2025-01-27 → 2026-06-30. <strong>Tables:</strong>
+      <code>fact_content_daily_performance</code> (grain: report_date × client × content) for the
+      feature and label windows, joined to <code>dim_content</code> for content metadata.
+    </p>
+    <div class="stat-row">
+      <div class="stat"><div class="n">~35M</div><div class="label">raw page-day rows scanned (DuckDB, remote Parquet)</div></div>
+      <div class="stat"><div class="n">65,019</div><div class="label">pages in the final panel</div></div>
+      <div class="stat"><div class="n">27</div><div class="label">clients represented</div></div>
+      <div class="stat"><div class="n">57.7%</div><div class="label">true future decline rate</div></div>
+    </div>
+    <h3>Windows</h3>
+    <ul>
+      <li><strong>Feature window (prior):</strong> 2026-01-01 → 2026-03-31 — a full quarter,
+        everything the model is allowed to see.</li>
+      <li><strong>Label window (future):</strong> 2026-04-01 → 2026-04-30 — strictly after the
+        decision point, used only to compute the outcome.</li>
+      <li>The final panel month (June 2026) was left untouched entirely, per the dataset's
+        sealed-test-month guidance, so it remains available as a true hold-out for future work.</li>
+    </ul>
+    <h3>Excluded, and why</h3>
+    <ul>
+      <li><strong>GA4 signals</strong> (sessions, engagement, AI-referral traffic) — an earlier
+        data-contract audit found GA4 availability follows each client's onboarding date, not
+        randomness, so it's excluded entirely rather than silently zero-filled.</li>
+      <li><strong><code>content_type</code></strong> — after the coverage filter below, the panel
+        is ~99% one category (<code>keyword article</code>); no signal left to use.</li>
+      <li><strong>Raw IDs</strong> (<code>client_hash_id</code>, <code>content_hash_id</code>) —
+        pseudonymous, grouping and joins only, never model inputs.</li>
+      <li>No client names, domains, raw URLs, or raw queries appear anywhere in this project.</li>
+    </ul>
+  </section>
+
+  <section id="methodology">
+    <h2><span class="num">04</span> Methodology</h2>
+
+    <h3>Label</h3>
+    <p>
+      <code>is_declining_future</code>: compare each page's <em>daily rate</em> in Q1 vs. April
+      (impressions ÷ days with available data — not raw totals, since the windows are 90 vs. 30
+      days). 1 if the April daily rate is lower than the Q1 daily rate, else 0.
+    </p>
+    <h3>Coverage filter</h3>
+    <p>
+      History depth varies wildly per client. A page only enters the panel with ≥60 of 90 Q1 days
+      and ≥20 of 30 April days of available data — otherwise a client's rate estimate rests on too
+      few days to trust.
+    </p>
+
+    <h3>Features (pre-decision only)</h3>
+    <p>
+      <code>avg_daily_q1</code>, <code>avg_daily_clicks_q1</code>, <code>ctr_q1</code>,
+      <code>avg_position_q1</code>, <code>content_age_days_at_decision</code>,
+      <code>impressions_cv_q1</code> (day-to-day volatility across the full quarter),
+      <code>days_with_impressions_frac_q1</code>, <code>word_count_filled</code> (+
+      missingness flag), <code>search_volume</code>, <code>main_intent</code>,
+      <code>competition_level</code>.
+    </p>
+
+    <h3>Signal checks, before building anything</h3>
+    <div class="grid-2">
+      <div class="card">
+        <span class="tag opposite">Unusable here</span>
+        <p style="margin-top:10px"><strong>Staleness</strong> (days since last update) vs. the
+        true future label: only 5 of 65,019 pages had gone 180+ days without an update in this
+        slice (all 5 later declined, but n is far too small to act on). Excluded from the rule —
+        confirming, on the true label this time, the same exclusion an earlier signal audit made
+        on the CSV proxy.</p>
+      </div>
+      <div class="card">
+        <span class="tag confirmed">Confirmed</span>
+        <p style="margin-top:10px"><strong>CTR vs. position tier</strong>: mean CTR falls
+        monotonically from 0.32% (top 3) to 0.045% (deep) across 57,357 visible pages. A page
+        with unusually low CTR for its position is a real, fixable anomaly — this became the
+        baseline rule's core.</p>
+      </div>
+    </div>
+    <figure>
+      <img src="assets/ctr_vs_position.png" alt="Bar chart showing mean CTR falling from 0.32% at top-3 position to 0.045% at deep position, Q1 2026 warehouse data" loading="lazy">
+      <figcaption>Fig. 1 — CTR falls with position, exactly as the baseline rule assumes (Q1 2026, visible pages, n per bar shown).</figcaption>
+    </figure>
+
+    <h3>Baseline (frozen rule)</h3>
+    <p>
+      <code>0.45 × visibility_score + 0.40 × ctr_gap_score + 0.15 × depth_gap_score</code>, where
+      <code>ctr_gap_score</code> measures how far a page's CTR sits below its position tier's
+      median. Every scored page gets exactly one reason code
+      (<code>demand_with_ctr_gap</code>, <code>thin_visible_page</code>, or
+      <code>general_review</code>) and one suggested action.
+    </p>
+
+    <h3>Split design</h3>
+    <p>
+      Client-grouped, but <strong>row-balanced</strong>, not client-count-balanced. A first
+      80/20-by-client-count attempt put only 181 rows in test, because 6 of 27 clients hold 93%
+      of all pages — reported here rather than hidden. Fixed by shuffling clients and greedily
+      assigning them to the test bucket until it holds ~20% of <em>rows</em>. Still fully grouped
+      (a client's pages never split across train/test) and time-aware by construction (the label
+      window is strictly after the feature window for every row).
+    </p>
+    <div class="stat-row">
+      <div class="stat"><div class="n">48,890</div><div class="label">train rows · 13 clients</div></div>
+      <div class="stat"><div class="n">16,129</div><div class="label">test rows · 14 clients</div></div>
+      <div class="stat"><div class="n">47.2%</div><div class="label">test-set base rate</div></div>
+    </div>
+
+    <h3>Leakage check</h3>
+    <p>
+      The label's own source columns (<code>impressions_apr</code>, <code>days_with_data_apr</code>)
+      are asserted absent from the feature list before training. <code>trend_direction</code> /
+      <code>trend_pct</code> — the CSV-era leakage trap — don't exist in this table at all.
+    </p>
+  </section>
+
+  <section id="results">
+    <h2><span class="num">05</span> Results</h2>
+    <p>Same test split, same metrics, baseline frozen exactly as specified above.</p>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Model</th><th>P@20</th><th>P@50</th><th>P@100</th><th>ROC-AUC</th><th>Avg. precision</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Baseline rule (frozen)</td><td class="num">0.60</td><td class="num">0.66</td><td class="num">0.66</td><td class="num">0.493</td><td class="num">0.488</td></tr>
+          <tr><td>Logistic Regression</td><td class="num">0.80</td><td class="num">0.74</td><td class="num">0.76</td><td class="num">0.526</td><td class="num">0.523</td></tr>
+          <tr><td>Random Forest</td><td class="num win">0.85</td><td class="num win">0.82</td><td class="num win">0.83</td><td class="num win">0.530</td><td class="num win">0.531</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.85rem; color:var(--text-muted)">Test-set base rate: 47.2% — every precision@K figure above should be read against this.</p>
+
+    <figure>
+      <img src="assets/model_comparison.png" alt="Grouped bar chart comparing precision at 20, 50, and 100 for the baseline rule, logistic regression, and random forest, with a dashed line at the 0.47 base rate" loading="lazy">
+      <figcaption>Fig. 2 — Random Forest clears the baseline and the base rate at every K.</figcaption>
+    </figure>
+
+    <div class="callout">
+      Random Forest wins on every metric. Logistic Regression also beats the baseline at every
+      precision@K — a different result from the CSV-based run earlier in this project, reported
+      as it came out rather than smoothed to match.
+    </div>
+    <div class="callout warn">
+      <strong>The honest headline, not a footnote:</strong> ROC-AUC sits at 0.49–0.53 for all
+      three approaches — barely above chance across the <em>whole</em> ranking. Forecasting a
+      real next-month outcome from one prior quarter is genuinely harder than the same-window
+      proxy label used in earlier weeks. Top-of-list precision is strong and decision-relevant
+      (what a review queue actually needs); overall discrimination across every page is not.
+    </div>
+
+    <h3>What the model actually leans on</h3>
+    <p>
+      Impurity-based importance and permutation importance <strong>disagree</strong> — and that
+      disagreement is the real finding. Impurity importance ranks
+      <code>content_age_days_at_decision</code> and <code>avg_position_q1</code> highest, but
+      impurity importance is known to inflate continuous, high-cardinality features regardless of
+      whether they help on new data. Permutation importance — measured by shuffling each column on
+      the <em>held-out test set</em> and watching the score drop — tells a different story:
+      <code>ctr_q1</code> (0.028) and <code>word_count_filled</code> (0.027) are what the model
+      actually relies on to generalize; <code>avg_position_q1</code> drops to a distant third
+      (0.003), and <code>content_age_days_at_decision</code> — the #1 impurity feature — doesn't
+      place in the permutation top 8 at all.
+    </p>
+    <figure>
+      <img src="assets/permutation_importance.png" alt="Horizontal bar chart of Random Forest permutation importance, topped by ctr_q1 and word_count_filled" loading="lazy">
+      <figcaption>Fig. 3 — Permutation importance on held-out data: CTR and word count dominate, not age or position.</figcaption>
+    </figure>
+
+    <h3>Where it's wrong</h3>
+    <div class="grid-2">
+      <div class="card">
+        <strong>2,368 false positives</strong> (of 16,129 test rows) — pages with real demand
+        (~22–30 impressions/day), a great position (1.8–5.8), and a very low CTR (0.07–0.16%).
+        The model reads "great position, terrible CTR" as risk, but these pages' volume held up
+        or grew anyway — CTR and impression-volume decline are different axes, and the model
+        conflates them here.
+      </div>
+      <div class="card">
+        <strong>5,106 false negatives</strong> — quiet pages (~2.4–2.8 impressions/day, position
+        43–63, zero CTR, 344–369 days old) that kept fading. Every signal is already near its
+        floor, leaving little room to distinguish "quietly still declining" from "quietly stable
+        at a low level."
+      </div>
+    </div>
+  </section>
+
+  <section id="limitations">
+    <h2><span class="num">06</span> Limitations &amp; honest framing</h2>
+    <ul class="limits-list">
+      <li><strong>Single prior-quarter window.</strong> Q1 2026 → April 2026 is one instance of a
+        prior→future split, not repeated across multiple quarters. A page's April behavior could
+        reflect a one-off event a longer backtest would average out.</li>
+      <li><strong>Modest overall discrimination.</strong> ROC-AUC of 0.49–0.53 means this panel
+        does not cleanly separate decliners from non-decliners across its full range — only at
+        the top of a ranked list.</li>
+      <li><strong>GA4-blind.</strong> Engagement and AI-referral signals are excluded entirely; a
+        page's true health picture here is search-only.</li>
+      <li><strong>Client concentration.</strong> 6 of 27 clients hold 93% of this panel's pages;
+        the row-balanced split fixes evaluation validity, but the panel itself still
+        overrepresents a few large clients' editorial patterns, and content-type diversity mostly
+        disappears under the coverage filter (~99% <code>keyword article</code>).</li>
+      <li><strong>No causal claim.</strong> This ranks pages by decline risk and CTR-friction
+        opportunity; it does not show that refreshing a page <em>causes</em> recovery. That needs
+        a controlled experiment, not observational ranking.</li>
+      <li><strong>No claim about Google's ranking algorithm.</strong> Every signal used here is an
+        observable, safe search/content metric — nothing in this project reverse-engineers or
+        claims to explain how Google ranks pages.</li>
+    </ul>
+    <p>Every result in this paper is <strong>observed, measured, and directional</strong> on this
+      one split of this one dataset — decision-support for a reviewer, never a guarantee.</p>
+  </section>
+
+  <section id="recommendations">
+    <h2><span class="num">07</span> Ranked recommendations</h2>
+    <p>
+      Final score blends the validated model with the transparent rule:
+      <code>0.65 × random_forest_probability + 0.35 × baseline_rule_score</code>. The rule's
+      reason code rides along on every row, so a reviewer always sees <em>why</em>, not just a
+      number.
+    </p>
+    <div class="stat-row">
+      <div class="stat"><div class="n">51,850</div><div class="label"><code>monitor</code></div></div>
+      <div class="stat"><div class="n">12,854</div><div class="label"><code>refresh_and_review_ctr</code></div></div>
+      <div class="stat"><div class="n">315</div><div class="label"><code>expand_and_refresh</code></div></div>
+    </div>
+
+    <h3>Top 10 (illustrative — pseudonymous IDs only)</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Score</th><th>Reason</th><th>Action</th><th>Impr./day (Q1)</th><th>Position</th><th>CTR</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td class="num">0.803</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">84.4</td><td class="num">0.82</td><td class="num">0.04%</td></tr>
+          <tr><td>2</td><td class="num">0.798</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">249.5</td><td class="num">1.10</td><td class="num">0.04%</td></tr>
+          <tr><td>3</td><td class="num">0.790</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">117.3</td><td class="num">2.50</td><td class="num">0.08%</td></tr>
+          <tr><td>4</td><td class="num">0.790</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">105.1</td><td class="num">4.02</td><td class="num">0.04%</td></tr>
+          <tr><td>5</td><td class="num">0.784</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">130.7</td><td class="num">0.60</td><td class="num">0.02%</td></tr>
+          <tr><td>6</td><td class="num">0.783</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">143.0</td><td class="num">1.68</td><td class="num">0.05%</td></tr>
+          <tr><td>7</td><td class="num">0.781</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">43.3</td><td class="num">1.53</td><td class="num">0.05%</td></tr>
+          <tr><td>8</td><td class="num">0.780</td><td>general_review</td><td>monitor</td><td class="num">142.9</td><td class="num">1.61</td><td class="num">0.14%</td></tr>
+          <tr><td>9</td><td class="num">0.780</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">203.0</td><td class="num">1.49</td><td class="num">0.03%</td></tr>
+          <tr><td>10</td><td class="num">0.780</td><td>demand_with_ctr_gap</td><td>refresh_and_review_ctr</td><td class="num">163.7</td><td class="num">1.22</td><td class="num">0.05%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.85rem; color:var(--text-muted)">
+      9 of the top 10 share the same reason code, drawn from only 3 distinct clients — a real
+      weak spot: the queue as shipped needs a per-client cap so one CTR-heavy client doesn't
+      crowd out every other client's opportunities.
+    </p>
+
+    <h3>How an editor would use this tomorrow</h3>
+    <ol>
+      <li>Open the top-K rows for the week's review capacity (K = 20–50, matched to the
+        precision@K this paper reports).</li>
+      <li>Read the reason code first — <code>refresh_and_review_ctr</code> means check title,
+        meta description, and SERP snippet before touching page content;
+        <code>expand_and_refresh</code> means the content itself is thin for its traffic.</li>
+      <li>Treat the score as a priority order, not a verdict — the false-positive analysis above
+        shows real cases where a flagged page was actually fine.</li>
+    </ol>
+  </section>
+
+  <section id="reproducibility">
+    <h2><span class="num">08</span> Reproducibility</h2>
+    <p>Random seed <code>42</code> throughout. The warehouse query result is explicitly
+      sorted before any downstream split or model fit, so re-running the notebook end to end
+      reproduces this exact table.</p>
+    <ul class="repro-links">
+      <li><span class="path">work/notebooks/capstone.ipynb</span>
+        <a href="https://github.com/amitroy257/my-flyrank-assignment1/blob/main/work/notebooks/capstone.ipynb">View on GitHub →</a></li>
+      <li><span class="path">work/notebooks/w04_baseline_score.ipynb</span>
+        <a href="https://github.com/amitroy257/my-flyrank-assignment1/blob/main/work/notebooks/w04_baseline_score.ipynb">Week 4 baseline →</a></li>
+      <li><span class="path">work/notebooks/w05_model.ipynb</span>
+        <a href="https://github.com/amitroy257/my-flyrank-assignment1/blob/main/work/notebooks/w05_model.ipynb">Week 5 model (CSV version) →</a></li>
+      <li><span class="path">work/outputs/capstone_metadata.json</span>
+        <span>this run's numeric receipts</span></li>
+      <li><span class="path">Full repository</span>
+        <a href="https://github.com/amitroy257/my-flyrank-assignment1">amitroy257/my-flyrank-assignment1 →</a></li>
+    </ul>
+  </section>
+
+  <section id="acknowledgments">
+    <h2><span class="num">09</span> Acknowledgments &amp; data credit</h2>
+    <p>
+      Built on the FlyRank ML Internship dataset. Learn more at
+      <a href="https://flyrank.ai" target="_blank" rel="noopener">flyrank.ai</a>.
+    </p>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Search Intelligence Capstone — Lane 2, Refresh / Content Opportunity Scoring.<br>
+    Observed, measured, directional, decision-support. No causal claims, no client-identifying
+    details, no claims about Google's ranking algorithm.</p>
+  </div>
+</footer>
+
+</body>
+</html>
